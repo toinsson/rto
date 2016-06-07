@@ -9,122 +9,40 @@ import filters
 import numpy as np
 import random
 
-class AxisFilter:
-    def __init__(self, window, order, sr=128, cutoff=32):
-        self.order =  order
-        self.interpolator = filters.Interpolator(wrap_limit=256)
-        self.sgolay = filters.SGolayFitter(window, order)
-        self.pre_filter = filters.ButterFilter(4, [cutoff/float(sr)])
-        self.samples = []
-        self.last_sample = []
-        self.full = False
 
-    def get_samples(self):
-        return self.samples
-
-    def new_sample(self, x, t):
-        self.samples = []
-        self.interpolator.add_packet(x, t)
-        pkts = self.interpolator.get_packets()
-        for new_packet in pkts:
-            new_packet = self.pre_filter.new_sample(new_packet)
-            self.samples.append(self.sgolay.new_sample(new_packet))
-            self.full = self.sgolay.full
-        return len(pkts)
-
-    def new_sample_uninterpolated(self, x):
-        new_packet = self.pre_filter.new_sample(x)
-        self.last_sample = self.sgolay.new_sample(x)
-        self.full = self.sgolay.full
-
-
-def subsample(x, p):
-    subset = np.random.uniform(0,1,(len(x),))
-    subset = np.nonzero(subset<p)[0]
-
-    return x[subset,:]
-
-class Knn:
-    def __init__(self, preloaded=None):
-        self.data = None
-        self.icov = None
-        self.vectors = 0
-        if preloaded:
-            infile = open(preloaded, 'r')
-            (data,) = cPickle.load(infile)
-            infile.close()
-
-    def recompute_covariance(self):
-        self.mean = np.mean(self.data, axis=0)
-        self.icov = np.linalg.pinv(np.cov((self.data-self.mean).transpose()))
-
-    def add_vector(self, vector):
-        if self.data!=None:
-            self.data = np.vstack((self.data, vector))
-            self.vectors += 1
-            if self.vectors % 25 == 0:
-                self.recompute_covariance()
-        else:
-            self.data = np.array([vector])
-            self.mean = np.zeros((len(vector),))
-            # self.icov = np.loadtxt("default.cov")
-            # self.icov = np.ones()
-
-    def load(self, name):
-        self.data = np.loadtxt(os.path.join(name, "vectors.data"))
-        self.vectors = len(self.data)
-        self.recompute_covariance()
-        print "Continuing with %d vectors" % self.vectors
-
-    def save(self,name):
-        np.savetxt(os.path.join(name,"vectors.data" ), self.data)
-        np.savetxt(os.path.join(name,"vectors.cov"), np.array(self.icov))
-
-
-    def classify(self, input):
-
-        if self.data==None or self.icov==None:
-            return None
-        d = self.data
-        n = len(d)
-        if n<0:
-            return None
-        input = input
-        repmatrix = np.tile(input, (n,1) )
-
-        #compute Mahalanobis distance
-        diff = (d-repmatrix)
-        sums = []
-
-        for row in diff:
-            row = row[:,np.newaxis]
-            sums.append(np.sqrt(np.dot(np.dot(row.transpose(),self.icov),row)[0,0]))
-        sums = np.array(sums)
-
-        #sort neighbours
-        ordered = np.sort(sums)
-        return ordered
-
-    def classify_from(self, input, index):
-
-        if self.data==None or self.icov==None:
-            return None
-
-        #compute Mahalanobis distance
-        diff = (self.data[index]-input)
-        row = diff[:,np.newaxis]
-        sums = []
-        sums.append(np.dot(np.dot(row.transpose(),self.icov),row)[0,0])
-        sums = np.array(sums)
-        return sums
 
 
 class MotionExplorer:
-    def __init__(self, ndim = 2, window=30, order=4, sr=128, filter_cutoff=32, logname='./'):
+    """
+    """
+    def __init__(self,
+        ndim = 2, 
+        window=30, 
+        order=4, 
+        sr=128, 
+        filter_cutoff=32, 
+        logname='./'):
+    """
+    Parameters
+    ----------
+    ndim : int
+        number of dimension of the input vector
+    window : int
+        windowing size for Savitzky Golay
+    order : int
+        order of the Savitzky Golay interpolation
+    sr : int
+        sampling rate
+    filter_cutoff : int
+        cutoff frequency for the Butter filter
+    """
         self.axis = []
         self.axes = ndim
 
         self.order = order
+
+
+
         self.acceleration_limit = config.acceleration_limit
         self.lock = 0
         self.inhibited = False
@@ -137,7 +55,7 @@ class MotionExplorer:
         self.log = open(os.path.join(logname, "rawdata.txt"), "w", buffering=800000)
 
         for axis in range(self.axes):
-            self.axis.append(AxisFilter(window,order,sr=sr,cutoff=filter_cutoff))
+            self.axis.append(filters.AxisFilter(window,order,sr=sr,cutoff=filter_cutoff))
 
         self.originality= config.originality
         self.k = config.k
@@ -149,14 +67,6 @@ class MotionExplorer:
     def invalidate(self):
         self.drops = 40
 
-    def distance(self, index):
-        outputs = self.knn_model.classify_from(self.last_output, index)
-        realscore = outputs
-
-        #discard NaN and inf
-        if not (realscore>0 and realscore<1e6):
-            realscore = 0
-        return realscore
 
     def knn(self):
         # don't do anything if the motion is out of range!
@@ -190,9 +100,6 @@ class MotionExplorer:
         return score,added
 
 
-    def close(self):
-        self.log.close()
-
     def get_vectors(self):
         return self.knn_model.vectors
 
@@ -207,19 +114,10 @@ class MotionExplorer:
             self.last_at = at
 
     def new_sample(self, ms, ndata):
-        """
-        """
-
-        # print ndata
-
         output = np.zeros(self.axes*self.order,)
-
-
-        # (at,ax,ay,az,mx,my,mz,gx,gy,gz) = shake_queue.get()
 
         # do the sgolay fit
         for i, data in enumerate(ndata):
-            # print i, data
             self.axis[i].new_sample(ms, data)
 
         ## CHECK
@@ -233,12 +131,9 @@ class MotionExplorer:
             self.drops += ms-self.last_at
 
         self.drops *= 0.9
-
-        # self.log.write("%f  %d   %f %f %f  %f %f %f  %f %f %f  %f\n" % (time.clock(), at, ax,ay,az, mx,my,mz, gx,gy,gz, self.drops))
-
         self.last_at = ms
-
         self.lock = self.lock*0.95
+
         if self.lock<10:
             self.inhibited = False
 
@@ -250,11 +145,91 @@ class MotionExplorer:
                 #only use the latest sample
                 diffs = d[0]
                 #copy out the derivatives
-
                 for di in diffs:
                     output[c] = di
                     c = c + 1
-
         self.last_output = output
+
         return 1
+
+class Knn:
+    def __init__(self, preloaded=None):
+        self.data = None
+        self.icov = None
+        self.vectors = 0
+
+        if preloaded:
+            infile = open(preloaded, 'r')
+            (data,) = cPickle.load(infile)
+            infile.close()
+
+    def recompute_covariance(self):
+        self.mean = np.mean(self.data, axis=0)
+        self.icov = np.linalg.pinv(np.cov((self.data-self.mean).transpose()))
+
+    def add_vector(self, vector):
+
+        if self.data != None:
+
+            self.data = np.vstack((self.data, vector))
+            self.vectors += 1
+            if self.vectors % 25 == 0:
+                self.recompute_covariance()
+
+        else:
+            self.data = np.array([vector])
+            self.mean = np.zeros((len(vector),))
+            # self.icov = np.loadtxt("default.cov")
+            # self.icov = np.ones()
+
+    # def load(self, name):
+    #     self.data = np.loadtxt(os.path.join(name, "vectors.data"))
+    #     self.vectors = len(self.data)
+    #     self.recompute_covariance()
+    #     print "Continuing with %d vectors" % self.vectors
+
+    def save(self,name):
+        np.savetxt(os.path.join(name,"vectors.data" ), self.data)
+        np.savetxt(os.path.join(name,"vectors.cov"), np.array(self.icov))
+
+
+    def classify(self, input):
+
+        ## useless
+        if self.data==None or self.icov==None:
+            return None
+
+        d = self.data
+        n = len(d)
+        if n<0:
+            return None
+        input = input
+
+        repmatrix = np.tile(input, (n,1) )
+
+        #compute Mahalanobis distance
+        diff = (d-repmatrix)
+        sums = []
+
+        for row in diff:
+            row = row[:,np.newaxis]
+            sums.append(np.sqrt(np.dot(np.dot(row.transpose(),self.icov),row)[0,0]))
+        sums = np.array(sums)
+
+        #sort neighbours
+        ordered = np.sort(sums)
+        return ordered
+
+    def classify_from(self, input, index):
+
+        if self.data==None or self.icov==None:
+            return None
+
+        #compute Mahalanobis distance
+        diff = (self.data[index]-input)
+        row = diff[:,np.newaxis]
+        sums = []
+        sums.append(np.dot(np.dot(row.transpose(),self.icov),row)[0,0])
+        sums = np.array(sums)
+        return sums
 

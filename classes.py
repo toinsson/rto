@@ -14,15 +14,6 @@ import random
 
 class MotionExplorer:
     """
-    """
-    def __init__(self,
-        ndim = 2, 
-        window=30, 
-        order=4, 
-        sr=128, 
-        filter_cutoff=32, 
-        logname='./'):
-    """
     Parameters
     ----------
     ndim : int
@@ -36,13 +27,12 @@ class MotionExplorer:
     filter_cutoff : int
         cutoff frequency for the Butter filter
     """
+    def __init__(self, ndim = 2, window=30, order=4, sr=128, filter_cutoff=32, logname='./'):
+
         self.axis = []
         self.axes = ndim
 
         self.order = order
-
-
-
         self.acceleration_limit = config.acceleration_limit
         self.lock = 0
         self.inhibited = False
@@ -54,8 +44,11 @@ class MotionExplorer:
 
         self.log = open(os.path.join(logname, "rawdata.txt"), "w", buffering=800000)
 
+
+        ## create the filter per axis
         for axis in range(self.axes):
             self.axis.append(filters.AxisFilter(window,order,sr=sr,cutoff=filter_cutoff))
+
 
         self.originality= config.originality
         self.k = config.k
@@ -67,51 +60,6 @@ class MotionExplorer:
     def invalidate(self):
         self.drops = 40
 
-
-    def knn(self):
-        # don't do anything if the motion is out of range!
-        if self.inhibited:
-            return 0, 0
-
-        outputs = self.knn_model.classify(self.last_output)
-
-        #mean of top k
-        realscore = None
-        score = None
-        if outputs!=None and len(outputs)>0:
-            realscore = np.mean(outputs[0:self.k])
-
-            #discard NaN and inf
-            if not (realscore>0 and realscore<1e6):
-                realscore = 0
-
-            #nonlinear scoring -- give points only if > threshold away
-            if realscore>self.originality:
-                score = realscore
-            else:
-                score = 0
-
-        added = 0
-        # only keep "original" points
-        if self.axis[0].full and (not realscore or realscore>self.keep_level) and random.random()<config.knn_probability:
-            self.knn_model.add_vector(self.last_output)
-            added = 1
-
-        return score,added
-
-
-    def get_vectors(self):
-        return self.knn_model.vectors
-
-    # def continue_from(self, knn_state_fname):
-    #     self.knn_model.load(knn_state_fname)
-
-    def test_sample(self, s):
-        (ax,ay,az) = s.acc()
-        at = s.data_timestamp(SHAKE_SENSOR_ACC)
-        if at!=self.last_at:
-            print at,
-            self.last_at = at
 
     def new_sample(self, ms, ndata):
         output = np.zeros(self.axes*self.order,)
@@ -152,12 +100,47 @@ class MotionExplorer:
 
         return 1
 
+
+    def knn(self):
+        # don't do anything if the motion is out of range!
+        if self.inhibited:
+            return 0, 0
+
+        outputs = self.knn_model.classify(self.last_output)
+
+        #mean of top k
+        realscore = None
+        score = None
+        if outputs!=None and len(outputs)>0:
+            realscore = np.mean(outputs[0:self.k])
+
+            #discard NaN and inf
+            if not (realscore>0 and realscore<1e6):
+                realscore = 0
+
+            #nonlinear scoring -- give points only if > threshold away
+            if realscore>self.originality:
+                score = realscore
+            else:
+                score = 0
+
+        added = 0
+        # only keep "original" points
+        if self.axis[0].full and (not realscore or realscore>self.keep_level) and random.random()<config.knn_probability:
+            self.knn_model.add_vector(self.last_output)
+            added = 1
+
+        return score,added
+
+
 class Knn:
-    def __init__(self, preloaded=None):
+    def __init__(self, ndim=2, preloaded=None):
         self.data = None
         self.icov = None
-        self.vectors = 0
 
+        self.ndim = 2
+
+        self.vectors = 0
         if preloaded:
             infile = open(preloaded, 'r')
             (data,) = cPickle.load(infile)
@@ -180,17 +163,8 @@ class Knn:
             self.data = np.array([vector])
             self.mean = np.zeros((len(vector),))
             # self.icov = np.loadtxt("default.cov")
-            # self.icov = np.ones()
 
-    # def load(self, name):
-    #     self.data = np.loadtxt(os.path.join(name, "vectors.data"))
-    #     self.vectors = len(self.data)
-    #     self.recompute_covariance()
-    #     print "Continuing with %d vectors" % self.vectors
-
-    def save(self,name):
-        np.savetxt(os.path.join(name,"vectors.data" ), self.data)
-        np.savetxt(os.path.join(name,"vectors.cov"), np.array(self.icov))
+            self.icov = np.eye(2*4)
 
 
     def classify(self, input):
@@ -203,6 +177,7 @@ class Knn:
         n = len(d)
         if n<0:
             return None
+
         input = input
 
         repmatrix = np.tile(input, (n,1) )

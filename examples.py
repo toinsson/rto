@@ -61,6 +61,10 @@ def main(args):
     mexp = classes.MotionExplorer(ndim = 2, window=window, 
                                 order=order, sr=sr, filter_cutoff=cutoff)
 
+    # make sure to init mexp
+    mexp.knn_model.add_vector(np.zeros(2*order))
+
+
     def mouse_cb(event,x,y,flags,param):
         global posx, posy
         posx, posy = x, y
@@ -111,7 +115,12 @@ def main(args):
 
         mexp.new_sample(newms, (posx, posy))
         score, added = mexp.knn()
-        # print newms-lastms, posx, posy, mexp.drops, score, added
+
+        print newms-lastms, posx, posy, score, added
+
+        if added:
+            print('== : ', mexp.knn_model.vectors)
+
 
         k = cv2.waitKey(1)
         key = chr(k & 255)

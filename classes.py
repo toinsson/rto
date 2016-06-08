@@ -156,10 +156,10 @@ class Knn:
         self.add_vector(np.zeros(ndim*order))
 
 
-        if preloaded:
-            infile = open(preloaded, 'r')
-            (data,) = cPickle.load(infile)
-            infile.close()
+        # if preloaded:
+        #     infile = open(preloaded, 'r')
+        #     (data,) = cPickle.load(infile)
+        #     infile.close()
 
     def recompute_covariance(self):
         self.mean = np.mean(self.data, axis=0)
@@ -173,6 +173,7 @@ class Knn:
             self.vectors += 1
             if self.vectors % 5 == 0:
                 self.recompute_covariance()
+            # print 'knn1:', self.data
 
         else:
             self.data = np.array([vector])
@@ -180,7 +181,10 @@ class Knn:
             # self.icov = np.loadtxt("default.cov")
 
             self.icov = np.eye(self.order*self.ndim)
+            print 'knn0: ' ,self.data
 
+
+    
 
     def classify(self, data):
 
@@ -188,17 +192,25 @@ class Knn:
         # if self.data==None or self.icov==None:
         #     return None
 
-        d = self.data
-        n = len(d)
-        if n<0:
-            return None
+
+
+        # d = self.data
+        # n = len(d)
+        # if n<0:
+            # return None
 
         # data = data
 
-        repmatrix = np.tile(data, (n,1) )
+        repmatrix = np.tile(data, (self.data.shape[0],1) )
+
+        # print d
+        # print n
+        # print self.data
+        # print data
+        # print repmatrix
 
         #compute Mahalanobis distance
-        diff = (d-repmatrix)
+        diff = (self.data-repmatrix)
         sums = []
 
         for row in diff:
@@ -211,16 +223,16 @@ class Knn:
         ordered = np.sort(sums)
         return ordered
 
-    def classify_from(self, input, index):
+    # def classify_from(self, input, index):
 
-        if self.data==None or self.icov==None:
-            return None
+    #     if self.data==None or self.icov==None:
+    #         return None
 
-        #compute Mahalanobis distance
-        diff = (self.data[index]-input)
-        row = diff[:,np.newaxis]
-        sums = []
-        sums.append(np.dot(np.dot(row.transpose(),self.icov),row)[0,0])
-        sums = np.array(sums)
-        return sums
+    #     #compute Mahalanobis distance
+    #     diff = (self.data[index]-input)
+    #     row = diff[:,np.newaxis]
+    #     sums = []
+    #     sums.append(np.dot(np.dot(row.transpose(),self.icov),row)[0,0])
+    #     sums = np.array(sums)
+    #     return sums
 

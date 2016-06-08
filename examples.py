@@ -57,7 +57,7 @@ def main(args):
     window = 150
 
     cutoff = config.lowpass
-    order = 1
+    order = 2
     mexp = classes.MotionExplorer(ndim = 2, window=window, 
                                 order=order, sr=sr, filter_cutoff=cutoff)
 
@@ -118,8 +118,8 @@ def main(args):
         f_velx[-1] = 1e2*mexp.last_output[1]
         f_velx_.set_data(x, f_velx)
 
-        # scatter_data = 512*np.random.random((100,2))
-        scxy.set_offsets(mexp.knn_model.data)
+        ## extract posx and posy
+        scxy.set_offsets(mexp.knn_model.data[:, [0,order]])
 
 
         plt.pause(0.01)

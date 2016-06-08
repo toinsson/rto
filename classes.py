@@ -29,23 +29,24 @@ class MotionExplorer:
     """
     def __init__(self, ndim = 2, window=30, order=4, sr=128, filter_cutoff=32, logname='./'):
 
-        self.axis = []
         self.axes = ndim
 
         self.order = order
         self.acceleration_limit = config.acceleration_limit
+
         self.lock = 0
         self.inhibited = False
         self.sr = sr
         self.last_at = None
 
-        self.keep_level = config.keep_level
-        self.knn_model = Knn()
+        self.knn_model = Knn(ndim=ndim, order=order)
 
+
+        self.keep_level = config.keep_level
         self.log = open(os.path.join(logname, "rawdata.txt"), "w", buffering=800000)
 
-
         ## create the filter per axis
+        self.axis = []
         for axis in range(self.axes):
             self.axis.append(filters.AxisFilter(window,order,sr=sr,cutoff=filter_cutoff))
 
@@ -53,12 +54,11 @@ class MotionExplorer:
         self.originality= config.originality
         self.k = config.k
 
-        # self.sample_queue = Queue.Queue()
-        self.invalidate()
+        # def invalidate(self):
+        # self.invalidate()
+        self.drops = 40
         self.last_output = np.zeros((self.axes*self.order,))
 
-    def invalidate(self):
-        self.drops = 40
 
 
     def new_sample(self, ms, ndata):
@@ -111,6 +111,7 @@ class MotionExplorer:
         #mean of top k
         realscore = None
         score = None
+
         if outputs!=None and len(outputs)>0:
             realscore = np.mean(outputs[0:self.k])
 
@@ -122,25 +123,39 @@ class MotionExplorer:
             if realscore>self.originality:
                 score = realscore
             else:
-                score = 0
+                score = realscore
 
         added = 0
         # only keep "original" points
-        if self.axis[0].full and (not realscore or realscore>self.keep_level) and random.random()<config.knn_probability:
+        if (self.axis[0].full and 
+            # (not realscore or realscore>self.keep_level) and 
+            (realscore>self.keep_level) and 
+            random.random()<config.knn_probability):
+
             self.knn_model.add_vector(self.last_output)
             added = 1
+
+
+
 
         return score,added
 
 
 class Knn:
-    def __init__(self, ndim=2, preloaded=None):
+    def __init__(self, ndim=2, order=4, preloaded=None):
         self.data = None
         self.icov = None
 
-        self.ndim = 2
+        self.ndim = ndim
+        self.order = order
 
         self.vectors = 0
+
+
+        ## add vector 0
+        self.add_vector(np.zeros(ndim*order))
+
+
         if preloaded:
             infile = open(preloaded, 'r')
             (data,) = cPickle.load(infile)
@@ -156,7 +171,7 @@ class Knn:
 
             self.data = np.vstack((self.data, vector))
             self.vectors += 1
-            if self.vectors % 25 == 0:
+            if self.vectors % 5 == 0:
                 self.recompute_covariance()
 
         else:
@@ -164,23 +179,23 @@ class Knn:
             self.mean = np.zeros((len(vector),))
             # self.icov = np.loadtxt("default.cov")
 
-            self.icov = np.eye(2*4)
+            self.icov = np.eye(self.order*self.ndim)
 
 
-    def classify(self, input):
+    def classify(self, data):
 
-        ## useless
-        if self.data==None or self.icov==None:
-            return None
+        # ## useless
+        # if self.data==None or self.icov==None:
+        #     return None
 
         d = self.data
         n = len(d)
         if n<0:
             return None
 
-        input = input
+        # data = data
 
-        repmatrix = np.tile(input, (n,1) )
+        repmatrix = np.tile(data, (n,1) )
 
         #compute Mahalanobis distance
         diff = (d-repmatrix)
@@ -189,6 +204,7 @@ class Knn:
         for row in diff:
             row = row[:,np.newaxis]
             sums.append(np.sqrt(np.dot(np.dot(row.transpose(),self.icov),row)[0,0]))
+
         sums = np.array(sums)
 
         #sort neighbours

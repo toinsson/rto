@@ -1,4 +1,4 @@
-# Rewarding the Original
+# Rewarding The Original
 
 # TODO:
 - add support for sound

@@ -4,66 +4,19 @@ import time
 import numpy as np
 import cv2
 
-import classes
-import config
-
-
 import matplotlib
 from matplotlib import pyplot as plt
 
+import rto
 
-# global x_, posy
+# global for plt callback
 posx, posy = 0,0
-
-
-import pyaudio
-import wave
-def _playsound():
-
-    #define stream chunk
-    chunk = 1024
-
-    #open a wav format music
-    f = wave.open(r"./start.wav","rb")
-    #instantiate PyAudio
-    p = pyaudio.PyAudio()
-    #open stream
-    stream = p.open(format = p.get_format_from_width(f.getsampwidth()),
-                    channels = f.getnchannels(),
-                    rate = f.getframerate(),
-                    output = True)
-    #read data
-    data = f.readframes(chunk)
-
-    #play stream
-    while data != '':
-        stream.write(data)
-        data = f.readframes(chunk)
-
-    #stop stream
-    stream.stop_stream()
-    stream.close()
-
-    #close PyAudio
-    p.terminate()
-
-
 
 
 def main(args):
 
-    sr = config.sample_rate
-    window = int(config.window*config.sample_rate)
-    window = 150
-
-    cutoff = config.lowpass
-    order = 2
-    mexp = classes.MotionExplorer(ndim = 2, window=window, 
-                                order=order, sr=sr, filter_cutoff=cutoff)
-
-    # make sure to init mexp
-    # mexp.knn_model.add_vector(np.zeros(2*order))
-
+    order = args.d
+    mexp = rto.MotionExplorer(inputdim = 2)
 
     def mouse_cb(event,x,y,flags,param):
         global posx, posy
@@ -75,9 +28,6 @@ def main(args):
     cv2.setMouseCallback('image', mouse_cb)
 
     lastms = int(round(time.time() * 1000))
-
-    # fig0, ax0 = plt.subplots(1, 2)
-
 
     fig, ax = plt.subplots(1, 2)
     ax0 = ax[0]
@@ -99,8 +49,6 @@ def main(args):
 
     while True:
 
-        # import ipdb; ipdb.set_trace()
-
         newms = int(round(time.time() * 1000))
 
         img[posy, posx] = [0,0,255]
@@ -111,26 +59,22 @@ def main(args):
         posx_.set_data(x, posx_arr)
 
         f_posx = np.roll(f_posx,-1)
-        f_posx[-1] = mexp.last_output[0]
+        f_posx[-1] = mexp.last_sample[0]
         f_posx_.set_data(x, f_posx)
 
         f_velx = np.roll(f_velx,-1)
-        f_velx[-1] = 1e2*mexp.last_output[1]
+        f_velx[-1] = 1e2*mexp.last_sample[1]
         f_velx_.set_data(x, f_velx)
 
         ## extract posx and posy
-        scxy.set_offsets(mexp.knn_model.data[:, [0,order]])
-
+        scxy.set_offsets(mexp.observations[:, [0, order]])
 
         plt.pause(0.01)
 
-        mexp.new_sample(newms, (posx, posy))
-        score, added = mexp.knn()
+        score, added = mexp.new_sample(newms, (posx, posy))
 
         print newms-lastms, posx, posy, score, added
 
-        # if added:
-        #     print('== : ', mexp.knn_model.vectors)
 
         k = cv2.waitKey(1)
         key = chr(k & 255)
@@ -145,6 +89,6 @@ def main(args):
 if __name__=="__main__":
 
     parser = argparse.ArgumentParser(description='Implementation of ROT with mouse input.')
-    parser.add_argument('-d', metavar='X', help='number of derivatives', required=False, default=0)
+    parser.add_argument('-d', metavar='X', help='number of derivatives', required=False, default=4)
     args = parser.parse_args()
     main(args)

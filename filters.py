@@ -19,15 +19,25 @@ class AxisFilter:
         return self.samples
 
     def new_sample(self, t, x):
+        self.timestamp = []
         self.samples = []
 
-        self.interpolator.add_packet(t, x)
+        last_t = self.interpolator.add_packet(t, x)
         pkts = self.interpolator.get_packets()
+
+        # print pkts
+        tmp = np.arange(last_t+10, t, 10)
+        if tmp.size == 0:
+            self.timestamp = t
+        else:
+            self.timestamp = tmp
 
         for new_packet in pkts:
             new_packet = self.pre_filter.new_sample(new_packet)
             self.samples.append(self.sgolay.new_sample(new_packet))
             self.full = self.sgolay.full
+
+        print 'axis ', last_t, t, len(pkts)
 
         return len(pkts)
 
@@ -35,6 +45,52 @@ class AxisFilter:
         new_packet = self.pre_filter.new_sample(x)
         self.last_sample = self.sgolay.new_sample(x)
         self.full = self.sgolay.full
+
+class AxisFilter2:
+    """Filters an unevenly sampled measurement dimension. It interpolates at constant time steps `stepsize` in ms, performs Butter worth filetering and Savitsky Golay interpolation of order `order` over a moving window `window`.
+    """
+    def __init__(self, stepsize, order, window):
+        self.stepsize = stepsize
+        self.order = order
+
+        self.interpolator = TimeInterpolator2(stepsize)
+
+        self.sgfitter = SGolayFitter(window, order)
+
+    def new_sample(self, time, value):
+        self.samples = np.empty((0,self.order))
+
+        self.interpolator.new_sample(time, value)
+
+        for point in self.interpolator.value_steps:
+            point = self.sgfitter.new_sample(point)
+            self.samples = np.vstack((self.samples, point))
+
+        self.full = self.sgfitter.full
+
+
+class TimeInterpolator2:
+    """Interpolate between 2 measurements at constant step size X in ms.
+    """
+    def __init__(self, stepsize):
+        self.stepsize = stepsize
+        self.firstpoint = True
+
+    def new_sample(self, time, value):
+
+
+        if self.firstpoint == True:
+            self.firstpoint = False
+            self.time_steps = np.array([time])
+            self.value_steps = np.array([value])
+
+        else:
+            self.time_steps = np.arange(self.last_time, time, self.stepsize)
+            self.value_steps = np.interp(self.time_steps, [self.last_time, time], [self.last_value, value])
+
+        self.last_time = time
+        self.last_value = value
+
 
 
 
@@ -62,25 +118,28 @@ class TimeInterpolator:
             self.last_x = x
             self.first_time = False
             self.new_packets = [x]
-            return
+            return dt
 
         self.true_t = dt
 
         difference = dt - self.last_t
         samples = np.floor(difference / self.sample_time).astype(int)
 
-        # print samples
+        # print 'samples: ', samples
 
         # insert the interpolated packets
         self.new_packets = []
-        for i in range( samples):
+
+        for i in range(samples):
             interp = i/float(samples)
             new_sample = (1-interp)*self.last_x + (interp)*x
             self.new_packets.append(new_sample)
 
-
+        last_t = self.last_t
         self.last_t += samples*self.sample_time
         self.last_x = x
+
+        return last_t
 
 
 class SGolayFitter:
@@ -109,7 +168,7 @@ class SGolayFitter:
             self.full = True
         fits = np.zeros((self.order,))
 
-        # use enumerate
+        # use enumerate or map
         c = 0
         for buffer in self.buffers:
             fits[c] = buffer.filter(x)
@@ -232,39 +291,39 @@ class Ringbuffer:
         return s
 
 
-class Interpolator:
-    def __init__(self):
+# class Interpolator:
+#     def __init__(self):
 
-        self.first_time = True
-        self.last_t = 0
-        self.last_x = 0
-        self.new_packets = []
+#         self.first_time = True
+#         self.last_t = 0
+#         self.last_x = 0
+#         self.new_packets = []
 
-    def add_packet(self, t, x):
+#     def add_packet(self, t, x):
 
-        if self.first_time:
-            self.first_time = False
-            self.last_t = t
-            self.last_x = x
-            self.new_packets = [x]
-            return
+#         if self.first_time:
+#             self.first_time = False
+#             self.last_t = t
+#             self.last_x = x
+#             self.new_packets = [x]
+#             return
 
-        dt = t - self.last_t
+#         dt = t - self.last_t
 
-        if dt == 0:  # this packet isn't new
-            self.new_packets = []
-        elif dt==1:  # just one new packet
-            self.new_packets = [x]
-        else:  #linear interpolate
-            self.new_packets = []
-            for d in range(dt):
-                a = float(d) / float(dt)
-                i = (a)*self.last_x+(1-a)*x
-                self.new_packets = [i] + self.new_packets
+#         if dt == 0:  # this packet isn't new
+#             self.new_packets = []
+#         elif dt==1:  # just one new packet
+#             self.new_packets = [x]
+#         else:  #linear interpolate
+#             self.new_packets = []
+#             for d in range(dt):
+#                 a = float(d) / float(dt)
+#                 i = (a)*self.last_x+(1-a)*x
+#                 self.new_packets = [i] + self.new_packets
 
-        self.last_t = t
-        self.last_x = x
+#         self.last_t = t
+#         self.last_x = x
 
-    def get_packets(self):
-        return self.new_packets
+#     def get_packets(self):
+#         return self.new_packets
 

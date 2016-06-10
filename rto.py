@@ -1,11 +1,33 @@
 import numpy as np
 
 class MotionExplorer:
-
+    """
+    Aim at exploring motions, represented as sampled observations of a n-dimensional input vector. This stream of vectors describe a vector space in which the Mahalanobis distance is used to assess the distance of new samples to previously seen samples. Everytime a new sample is observed that is 
+    """
     def __init__(self, inputdim = 2, stepsize = 10, order = 4, window = 30,
-        start_buffer = 100, periodic_recompute = 5
+        start_buffer = 100, periodic_recompute = 5, number_of_neighbour = 5, 
+        number_of_stdev = 4.5
         ):
-
+        """
+        Parameters
+        ----------
+        inputdim : int
+            the number of dimension of the input vector.
+        stepsize : int
+            The size of the interpolation step in milliseconds.
+        order : int
+            The dimension of the output vector, 1 is position only, 2 includes velocity, 3 provides acceleration, and so on.
+        window : int
+            The size of the averaging window in samples.
+        start_buffer : int
+            The number of sample is takes before any observation can be saved.
+        periodic_recompute : int
+            The number of samples after which mean and covarianve of saved observations will be recomputed.
+        number_of_neighbour : int
+            The number of closest neighnbours that are considered when assessing if a new sample is original or not.
+        number_of_stdev : float
+            The number of standard deviation a new vectors has to be from the mean of K nearest neighbour as measured by Mahalanobis distance. When the mean of K is greater than this value, the new sample is considered original and saved to observations.
+        """
         self.inputdim = inputdim
         self.order = order
 
@@ -80,6 +102,16 @@ class AxisFilter:
     """Filters an unevenly sampled measurement dimension. It interpolates at constant time steps `stepsize` in ms, performs Butter worth filetering and Savitsky Golay interpolation of order `order` over a moving window `window`.
     """
     def __init__(self, stepsize, order, window):
+        """
+        Parameters
+        ----------
+        stepsize : int
+            The size of the interpolation step in milliseconds.
+        order : int
+            The dimension of the output vector, 1 is position only, 2 includes velocity, 3 provides acceleration, and so on.
+        window : int
+            The size of the averaging window in samples.
+        """
         self.stepsize = stepsize
         self.order = order
 

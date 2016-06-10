@@ -2,7 +2,10 @@ import numpy as np
 
 class MotionExplorer:
     """
-    Aim at exploring motions, represented as sampled observations of a n-dimensional input vector. This stream of vectors describe a vector space in which the Mahalanobis distance is used to assess the distance of new samples to previously seen samples. Everytime a new sample is observed that is 
+    Aim at exploring motions, represented as sampled observations of a n-dimensional input vector.
+    This stream of vectors describe a vector space in which the Mahalanobis distance is used to 
+    assess the distance of new samples to previously seen samples. Everytime a new sample is 
+    observed that is when that K nearest neighbour are in average further away than N standard deviation, the new sample is deamed original and saved to the attribute observations. 
     """
     def __init__(self, inputdim = 2, stepsize = 10, order = 4, window = 30,
         start_buffer = 100, periodic_recompute = 5, number_of_neighbour = 5, 
@@ -50,6 +53,26 @@ class MotionExplorer:
         self.last_sample = np.zeros(self.inputdim*self.order)
 
     def new_sample(self, ms, ndata):
+        """Passes a new observed sample to the motionexplorer. It will filter it based on the last 
+        observed sample and compute the distance of this current sample to all previously saved 
+        original samples. If the average distance of the N nearest neightbour is greater than X 
+        stdev, then the current sample is saved to the class attribute observations. 
+
+        Parameters
+        ----------
+        ms : int
+            Timestamp in milliseconds. This can be easily produced with the time module and the 
+            call to: int(round(time.time() * 1000)).
+        ndata : iterable
+            An iterable object (tuple, ndarray, ..) representing the N dimensional vector of the 
+            current sample.
+
+        Returns
+        -------
+        int, bool
+            average Mahalanobis distance to the K nearest neighboour and flag saying if the 
+            current sample is added to the set of original observations.
+        """
         ## ndata.shape == inputdim
         self.counter += 1
 

@@ -8,7 +8,7 @@ class MotionExplorer:
     observed that is when that K nearest neighbour are in average further away than N standard deviation, the new sample is deamed original and saved to the attribute observations. 
     """
     def __init__(self, inputdim = 2, stepsize = 10, order = 4, window = 30,
-        start_buffer = 100, periodic_recompute = 5, number_of_neighbour = 5, 
+        start_buffer = 10, periodic_recompute = 5, number_of_neighbour = 5, 
         number_of_stdev = 4.5
         ):
         """
@@ -23,7 +23,8 @@ class MotionExplorer:
         window : int
             The size of the averaging window in samples.
         start_buffer : int
-            The number of sample is takes before any observation can be saved.
+            The number of sample is takes before any observation can be saved, this leaves time 
+            for the Savitsky Golay interpolation to start ouputing some data.
         periodic_recompute : int
             The number of samples after which mean and covarianve of saved observations will be recomputed.
         number_of_neighbour : int
@@ -83,9 +84,6 @@ class MotionExplorer:
         if self.counter % self.periodic_recompute == 0:
             self.compute_observations_mean_icov()
 
-        ## do nothing for start_buffer samples
-        if self.counter < self.start_buffer:
-            return 0, 0
 
         ## get last sample from each axis and squash to 1D
         sample = np.array([self.axis[i].samples[-1] for i in range(self.inputdim)]).reshape(-1)
@@ -94,12 +92,17 @@ class MotionExplorer:
         distances = self.distance_to_observations(sample)
         distance_meank = np.mean(distances[:self.number_of_neighbour])
 
-        ## keep the sample if further than number of stdev to previous observations
-        if distance_meank > self.number_of_stdev:
-            self.observations = np.vstack((self.observations, sample))
-            added = True
+        if (self.counter > self.start_buffer) and self.axis[0].full:
 
-        else: added = False
+            ## keep the sample if further than number of stdev to previous observations
+            if distance_meank > self.number_of_stdev:
+                self.observations = np.vstack((self.observations, sample))
+                added = True
+
+            else: added = False
+
+        else: 
+            added = False
 
         self.last_sample = sample
 
@@ -140,6 +143,7 @@ class AxisFilter:
 
         self.interpolator = TimeInterpolator(stepsize)
         self.sgfitter = SavitskyGolayFitter(order, window)
+        self.full = False
 
     def new_sample(self, time, value):
         self.samples = np.empty((0,self.order))

@@ -35,7 +35,7 @@ def main(args):
     ax0 = ax[0]
     ax1 = ax[1]
 
-    ax0.set_ylim([0,512])
+    ax0.set_ylim([-512,512])
     x = np.linspace(1,100,100)
     posx_arr = np.zeros(100)
     posx_ = ax0.plot(x, posx_arr, 'o')[0]
@@ -101,6 +101,8 @@ def main(args):
         lastms = newms
 
     print 'number of saved original vectors: ', mexp.observations.shape[0]
+
+    np.save('observation_dim_'+str(order), mexp.observations)
 
 if __name__=="__main__":
 

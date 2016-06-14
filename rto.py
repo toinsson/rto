@@ -112,6 +112,7 @@ class MotionExplorer:
     def distance_to_observations(self, vector):
         """Return the Mahalanobis distance of vector to the space of all observations.
         The ouput distances are sorted.
+        https://en.wikipedia.org/wiki/Mahalanobis_distance
         """
         diff = self.observations - vector
         distances = np.sqrt(np.diag(np.dot(np.dot(diff, self.icov), diff.T)))

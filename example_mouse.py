@@ -12,13 +12,14 @@ import soundfile as sf
 
 import rto
 
+global posx, posy
 
 posx, posy = 0,0
 
 def main(args):
 
     order = args.d
-    mexp = rto.MotionExplorer(inputdim = 2, order = order)
+    mexp = rto.MotionExplorer(inputdim = 2, order = order, number_of_stdev = args.stdev)
 
     def mouse_cb(event,x,y,flags,param):
         global posx, posy
@@ -48,11 +49,16 @@ def main(args):
 
     scatter_data = 512*np.random.random((100,2))
     scxy = ax1.scatter(scatter_data[:,0], scatter_data[:,1])
+    ax1.set_xlim([0,512])
+    ax1.set_ylim([0,512])
 
     lastadded = int(round(time.time() * 1000))
     while True:
 
         newms = int(round(time.time() * 1000))
+
+        ## the print solves a bug with global variables on some platform
+        print posx, posy
 
         img[posy, posx] = [0,0,255]
         cv2.imshow('image', img)
@@ -108,6 +114,8 @@ if __name__=="__main__":
 
     parser = argparse.ArgumentParser(description='Implementation of ROT with mouse input.')
     parser.add_argument('-d', metavar='X', help='number of derivatives', required=False, default=4,
+        type=int)
+    parser.add_argument('--stdev', metavar='X', help='number of derivatives', required=False, default=4,
         type=int)
     args = parser.parse_args()
     main(args)

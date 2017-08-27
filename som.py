@@ -6,7 +6,7 @@
 # Distributed under the terms of the BSD License.
 # -----------------------------------------------------------------------------
 import numpy as np
-import scipy.weave
+import weave
 
 def fromdistance(fn, shape, center=None, dtype=float):
     def distance(*args):
@@ -23,9 +23,9 @@ def Gaussian(shape,center,sigma=0.5):
     def g(x):
         return np.exp(-x**2/sigma**2)
     return fromdistance(g,shape,center)
-    
 
-    
+
+
 def blitz_gaussian(shape, center, sigma=0.5):
     result = np.zeros(shape)
     w,h  = shape
@@ -34,9 +34,9 @@ def blitz_gaussian(shape, center, sigma=0.5):
     int i, j;
     double dx,dy;
     double d,g;
-    for(i=0;i<w;i++) 
+    for(i=0;i<w;i++)
     {
-        for(j=0;j<h;j++) 
+        for(j=0;j<h;j++)
         {
             dx = abs((double)i-(double)x);
             dy = abs((double)j-(double)y);
@@ -46,19 +46,19 @@ def blitz_gaussian(shape, center, sigma=0.5):
                 dy = h - dy;
             dx /= float(w);
             dy /= float(h);
-                
-            
+
+
             d = sqrt(dx*dx+dy*dy);
-            g = exp(-d*d/(sigma*sigma));            
+            g = exp(-d*d/(sigma*sigma));
             result(i,j) = g;
         }
-    }    
-    
-    """    
-    
-    err = scipy.weave.inline(code,
+    }
+
+    """
+
+    err = weave.inline(code,
                            ['result', 'w', 'h', 'x', 'y', 'sigma'],
-                           type_converters=scipy.weave.converters.blitz,
+                           type_converters=weave.converters.blitz,
                            compiler = 'gcc')
     return result
 
@@ -71,57 +71,57 @@ class SOM:
         self.codebook = np.zeros(args)
         self.reset()
 
+
     def reset(self):
         ''' Reset weights '''
         self.codebook = np.random.random(self.codebook.shape)
 
-  
-        
+
     def classify(self, sample):
         ''' classify a sample '''
         D = ((self.codebook-sample)**2).sum(axis=-1)
-        winner = np.unravel_index(np.argmin(D), D.shape)        
+        winner = np.unravel_index(np.argmin(D), D.shape)
         return winner
-        
+
+
     def density(self, samples):
         w, h, d = self.codebook.shape
         density = np.zeros((w,h))
-        
-        
+
+
         for sample in samples:
             D = ((self.codebook-sample)**2).sum(axis=-1)
-            winner = np.unravel_index(np.argmin(D), D.shape) 
+            winner = np.unravel_index(np.argmin(D), D.shape)
             density[winner] += 1
-            
-        return density
-            
 
-            
-        
-    
+        return density
+
+
     def get_nearest(self, x, y, data):
         print x,y
         D = ((self.codebook[x,y,:]-data)**2).sum(axis=-1)
         winner = np.argmin(D)
         return data[winner,:], winner
-    
-    
+
+
     def get_n_nearest_indices(self, x, y, data):
         D = ((self.codebook[x,y,:]-data)**2).sum(axis=-1)
         winner = np.argsort(D)
         return winner, D
-    
+
+
     def learn(self, samples, epochs=10000, sigma=(10, 0.001), lrate=(0.5,0.005)):
         ''' Learn samples '''
         sigma_i, sigma_f = sigma
         lrate_i, lrate_f = lrate
-                
+
         lrate = lrate_i
         sigma = sigma_i
         s = samples.shape[0]
         for i in range(epochs):
             if i%500==0:
                 print "Epoch \t %d /\t %d \tLrate:%.2f\t Sigma:%.2f" % (i, epochs, lrate, sigma)
+
             # Adjust learning rate and neighborhood
             t = i/float(epochs)
             lrate = lrate_i*(lrate_f/float(lrate_i))**t
@@ -132,7 +132,6 @@ class SOM:
             data = samples[index]
 
             # Get index of nearest node (minimum distance)
-            
             D = ((self.codebook-data)**2).sum(axis=-1)
             winner = np.unravel_index(np.argmin(D), D.shape)
 
@@ -140,7 +139,7 @@ class SOM:
             G = Gaussian(D.shape, winner, sigma)
             G = np.nan_to_num(G)
 
-            # Move nodes towards sample according to Gaussian 
+            # Move nodes towards sample according to Gaussian
             delta = self.codebook-data
             for i in range(self.codebook.shape[-1]):
                 self.codebook[...,i] -= lrate * G * delta[...,i]
@@ -150,21 +149,24 @@ class SOM:
 if __name__ == '__main__':
 
     import pylab
-    
+
     pylab.figure(1)
     g =  Gaussian((20,10), (1,5), 1.0)
     pylab.imshow(g)
     pylab.figure(2)
     g =  blitz_gaussian((20,10), (1,8), 1.0)
     pylab.imshow(g)
-    
+
     pylab.show()
-    
+
 
     import matplotlib
     import matplotlib.pyplot as plt
-    try:    from voronoi import voronoi
-    except: voronoi = None
+
+    from scipy.spatial import Voronoi, voronoi_plot_2d
+
+    # try:    from voronoi import voronoi
+    # except: voronoi = None
 
     def learn(network, samples, epochs=25000, sigma=(10, 0.01), lrate=(0.5,0.005)):
         network.learn(samples, epochs)
@@ -183,10 +185,15 @@ if __name__ == '__main__':
         else:
             plt.plot (x, y, 'k', alpha=0.85, lw=1.5, zorder=2)
         plt.scatter (x, y, s=50, c='w', edgecolors='k', zorder=3)
-        if voronoi is not None:
-            segments = voronoi(x.ravel(),y.ravel())
-            lines = matplotlib.collections.LineCollection(segments, color='0.65')
-            axes.add_collection(lines)
+
+
+        vor = Voronoi(samples)
+        voronoi_plot_2d(vor, ax=axes, show_points=False, show_vertices=False)
+        # if voronoi is not None:
+        #     segments = voronoi(x.ravel(),y.ravel())
+        #     lines = matplotlib.collections.LineCollection(segments, color='0.65')
+        #     axes.add_collection(lines)
+
         plt.axis([0,1,0,1])
         plt.xticks([]), plt.yticks([])
         plt.show()

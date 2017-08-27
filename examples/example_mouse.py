@@ -58,7 +58,7 @@ def main(args):
         newms = int(round(time.time() * 1000))
 
         ## the print solves a bug with global variables on some platform
-        print posx, posy
+        print(posx, posy)
 
         img[posy, posx] = [0,0,255]
         cv2.imshow('image', img)
@@ -106,7 +106,7 @@ def main(args):
 
         lastms = newms
 
-    print 'number of saved original vectors: ', mexp.observations.shape[0]
+    print('number of saved original vectors: ', mexp.observations.shape[0])
 
     np.save('observation_dim_'+str(order), mexp.observations)
 

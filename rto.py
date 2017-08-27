@@ -3,12 +3,12 @@ import numpy as np
 class MotionExplorer:
     """
     Aim at exploring motions, represented as sampled observations of a n-dimensional input vector.
-    This stream of vectors describe a vector space in which the Mahalanobis distance is used to 
-    assess the distance of new samples to previously seen samples. Everytime a new sample is 
-    observed that is when that K nearest neighbour are in average further away than N standard deviation, the new sample is deamed original and saved to the attribute observations. 
+    This stream of vectors describe a vector space in which the Mahalanobis distance is used to
+    assess the distance of new samples to previously seen samples. Everytime a new sample is
+    observed that is when that K nearest neighbour are in average further away than N standard deviation, the new sample is deamed original and saved to the attribute observations.
     """
     def __init__(self, inputdim = 2, stepsize = 10, order = 4, window = 30,
-        start_buffer = 10, periodic_recompute = 5, number_of_neighbour = 5, 
+        start_buffer = 10, periodic_recompute = 5, number_of_neighbour = 5,
         number_of_stdev = 4.5
         ):
         """
@@ -23,7 +23,7 @@ class MotionExplorer:
         window : int
             The size of the averaging window in samples.
         start_buffer : int
-            The number of sample is takes before any observation can be saved, this leaves time 
+            The number of sample is takes before any observation can be saved, this leaves time
             for the Savitsky Golay interpolation to start ouputing some data.
         periodic_recompute : int
             The number of samples after which mean and covarianve of saved observations will be recomputed.
@@ -48,30 +48,30 @@ class MotionExplorer:
         self.start_buffer = start_buffer
         self.periodic_recompute = periodic_recompute
 
-        self.number_of_neighbour = 5
-        self.number_of_stdev = 4.5
+        self.number_of_neighbour = number_of_neighbour
+        self.number_of_stdev = number_of_stdev
 
         self.last_sample = np.zeros(self.inputdim*self.order)
 
     def new_sample(self, ms, ndata):
-        """Passes a new observed sample to the motionexplorer. It will filter it based on the last 
-        observed sample and compute the distance of this current sample to all previously saved 
-        original samples. If the average distance of the N nearest neightbour is greater than X 
-        stdev, then the current sample is saved to the class attribute observations. 
+        """Passes a new observed sample to the motionexplorer. It will filter it based on the last
+        observed sample and compute the distance of this current sample to all previously saved
+        original samples. If the average distance of the N nearest neightbour is greater than X
+        stdev, then the current sample is saved to the class attribute observations.
 
         Parameters
         ----------
         ms : int
-            Timestamp in milliseconds. This can be easily produced with the time module and the 
+            Timestamp in milliseconds. This can be easily produced with the time module and the
             call to: int(round(time.time() * 1000)).
         ndata : iterable
-            An iterable object (tuple, ndarray, ..) representing the N dimensional vector of the 
+            An iterable object (tuple, ndarray, ..) representing the N dimensional vector of the
             current sample.
 
         Returns
         -------
         int, bool
-            average Mahalanobis distance to the K nearest neighboour and flag saying if the 
+            average Mahalanobis distance to the K nearest neighboour and flag saying if the
             current sample is added to the set of original observations.
         """
         ## ndata.shape == inputdim
@@ -101,7 +101,7 @@ class MotionExplorer:
 
             else: added = False
 
-        else: 
+        else:
             added = False
 
         self.last_sample = sample
@@ -126,7 +126,9 @@ class MotionExplorer:
 
 
 class AxisFilter:
-    """Filters an unevenly sampled measurement dimension. It interpolates at constant time steps `stepsize` in ms, performs Butter worth filetering and Savitsky Golay interpolation of order `order` over a moving window `window`.
+    """Filters an unevenly sampled measurement dimension. It interpolates at constant time steps
+    `stepsize` in ms, performs Butter worth filetering and Savitsky Golay interpolation of order
+    `order` over a moving window `window`.
     """
     def __init__(self, stepsize, order, window):
         """
